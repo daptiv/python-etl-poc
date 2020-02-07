@@ -7,6 +7,8 @@ import time
 
 from sf_connector import SF_CONNECTOR
 
+from snowflake.connector import DictCursor
+
 # Pygrametl's __init__ file provides a set of helper functions and more
 # importantly the class ConnectionWrapper for wrapping PEP 249 connections
 import pygrametl
@@ -53,7 +55,7 @@ def process():
                         'OBJECT_STATUS','CREATED_ON','UPDATED_BY','UPDATED_ON','ACTIVE_START_DATE','ACTIVE_FINISH_DATE','ENTERPRISE_ID']) """
 
         connector = SF_CONNECTOR().get_connector()
-        cursor = connector.cursor()
+        cursor = connector.cursor(DictCursor)
 
 
         sql = f"""
@@ -77,15 +79,33 @@ def process():
                     AND rowid = latestrowid
                 )
 
-           
             SELECT
-              sw.workspaceid, title, summary, startdate, enddate
-              , parentworkspaceid, externalid, health, workspaceproposalid
-                , approvalstatus, summarytaskid, priority, itemnumber
-                , state, notes, workspacephaseid, workspacerequesttypeid
-                , iscapacityplanned, objectstatus, createdon, updatedby
-                , updatedon, enterpriseid
-            FROM "PPM_TEST"."PRIVATE"."STG_WORKSPACE" sw
+                sw.rowid as STG_WORKSPACE_ROWID, 
+                sw.workspaceid as WORKSPACE_ID,  
+                title, 
+                summary, 
+                startdate as PLANNED_START, 
+                enddate as PLANNED_FINISH, 
+                parentworkspaceid, 
+                externalid as PARENT_WORKSPACE_IDEXTERNAL_ID, 
+                health, 
+                workspaceproposalid as ORIGINATED_FROM_PROPOSAL, 
+                approvalstatus as APPROVAL_STATUS, 
+                summarytaskid as SUMMARY_TASK_ID, 
+                priority, 
+                itemnumber as PROJECT_NUMBER,
+                state, 
+                notes, 
+                workspacephaseid as WORKSPACE_PHASE_ID, 
+                workspacerequesttypeid as REQUEST_TYPE_ID,
+                iscapacityplanned as IS_CAPACITY_PLANNED, 
+                objectstatus as OBJECT_STATUS, 
+                createdon as CREATED_ON, 
+                updatedby as UPDATED_BY,
+                updatedon as UPDATED_ON, 
+                enterpriseid as ENTERPRISE_ID
+            FROM 
+                "PPM_TEST"."PRIVATE"."STG_WORKSPACE" sw
                 INNER JOIN changed_workspaces cw
                     ON sw.workspaceid = cw.workspaceid
                     AND sw.rowid = cw.rowid
@@ -93,9 +113,7 @@ def process():
                 sw.enterpriseid = 'E93B6B81-4208-4E73-8F45-C6375238B363'
         """
 
-        results = cursor.execute(sql)
-
-        #print(results.fetchall())
+        cursor.execute(sql)
 
         """ for rec in results:
             print('%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s' % (rec[0], rec[1], rec[2],rec[3],rec[4],rec[5],rec[6],rec[7],rec[8],rec[9],rec[10],rec[11],
@@ -104,18 +122,10 @@ def process():
             # The timestamp is split into its three parts
             #split_timestamp(rec) """
 
-
-        #[workspace_dimension.insert(row) for row in results]
-
-
-        test = {'STG_WORKSPACE_ROWID' : 22270, 'WORKSPACE_ID' :'36a06410-c39e-4941-a15f-d33d486f3b16', 'TITLE' : 'test test test'}
-
-        workspace_dimension.insert(test)
-
-
-
-
-
+        for rec in cursor:
+            workspace_dimension.insert(rec)
+            #print('{0}, {1}'.format(rec['WORKSPACEID'], rec['TITLE']))
+       
         connection.commit()
 
 
