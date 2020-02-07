@@ -28,7 +28,7 @@ def process():
     
     try:
 
-        TRANSFORM_TIMESTAMP = str(datetime.utcnow())
+        #TRANSFORM_TIMESTAMP = str(datetime.utcnow())
 
         connection = pygrametl.ConnectionWrapper(connector)
         #connection.setasdefault()
@@ -44,10 +44,11 @@ def process():
         # named parameters is strongly encouraged.
         workspace_dimension = Dimension(
             name='DIM_WORKSPACE',
-            key='STG_WORKSPACE_ROWID',
-            attributes=['WORKSPACE_ID','TITLE'])
+            key='WORKSPACE_DIM_ID',
+            attributes=['STG_WORKSPACE_ROWID','WORKSPACE_ID','TITLE'],
+            lookupatts=['STG_WORKSPACE_ROWID'])
 
-        """ attributes=['WORKSPACE_ID','TITLE','SUMMARY','PLANNED_START','PLANNED_FINISH','PARENT_WORKSPACE_IDEXTERNAL_ID','HEALTH','ORIGINATED_FROM_PROPOSAL',
+        """ attributes=['STG_WORKSPACE_ROWID','WORKSPACE_ID','TITLE','SUMMARY','PLANNED_START','PLANNED_FINISH','PARENT_WORKSPACE_IDEXTERNAL_ID','HEALTH','ORIGINATED_FROM_PROPOSAL',
                         'APPROVAL_STATUS','SUMMARY_TASK_ID','PRIORITY','PROJECT_NUMBER','STATE','NOTES','WORKSPACE_PHASE_ID','REQUEST_TYPE_ID','IS_CAPACITY_PLANNED',
                         'OBJECT_STATUS','CREATED_ON','UPDATED_BY','UPDATED_ON','ACTIVE_START_DATE','ACTIVE_FINISH_DATE','ENTERPRISE_ID']) """
 
@@ -94,7 +95,7 @@ def process():
 
         results = cursor.execute(sql)
 
-        print(results)
+        #print(results.fetchall())
 
         """ for rec in results:
             print('%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s' % (rec[0], rec[1], rec[2],rec[3],rec[4],rec[5],rec[6],rec[7],rec[8],rec[9],rec[10],rec[11],
@@ -104,7 +105,16 @@ def process():
             #split_timestamp(rec) """
 
 
-        [workspace_dimension.insert(row) for row in results]
+        #[workspace_dimension.insert(row) for row in results]
+
+
+        test = {'STG_WORKSPACE_ROWID' : 22270, 'WORKSPACE_ID' :'36a06410-c39e-4941-a15f-d33d486f3b16', 'TITLE' : 'test test test'}
+
+        workspace_dimension.insert(test)
+
+
+
+
 
         connection.commit()
 
