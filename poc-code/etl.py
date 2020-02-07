@@ -44,15 +44,28 @@ def process():
         # present in the sales database and is enough to perform a lookup of
         # a unique primary key. As mentioned in the beginning of the guide, using
         # named parameters is strongly encouraged.
-        workspace_dimension = Dimension(
+        workspace_dimension = SlowlyChangingDimension(
             name='DIM_WORKSPACE',
             key='WORKSPACE_DIM_ID',
-            attributes=['STG_WORKSPACE_ROWID','WORKSPACE_ID','TITLE'],
-            lookupatts=['STG_WORKSPACE_ROWID'])
-
-        """ attributes=['STG_WORKSPACE_ROWID','WORKSPACE_ID','TITLE','SUMMARY','PLANNED_START','PLANNED_FINISH','PARENT_WORKSPACE_IDEXTERNAL_ID','HEALTH','ORIGINATED_FROM_PROPOSAL',
+            attributes=['STG_WORKSPACE_ROWID','WORKSPACE_ID','TITLE','SUMMARY','PLANNED_START','PLANNED_FINISH','PARENT_WORKSPACE_ID','HEALTH','ORIGINATED_FROM_PROPOSAL',
                         'APPROVAL_STATUS','SUMMARY_TASK_ID','PRIORITY','PROJECT_NUMBER','STATE','NOTES','WORKSPACE_PHASE_ID','REQUEST_TYPE_ID','IS_CAPACITY_PLANNED',
-                        'OBJECT_STATUS','CREATED_ON','UPDATED_BY','UPDATED_ON','ACTIVE_START_DATE','ACTIVE_FINISH_DATE','ENTERPRISE_ID']) """
+                        'OBJECT_STATUS','CREATED_ON','UPDATED_BY','UPDATED_ON','ACTIVE_START_DATE','ACTIVE_FINISH_DATE','VERSION','ENTERPRISE_ID'],
+            lookupatts=['WORKSPACE_ID'],
+            versionatt='VERSION',
+            fromatt='ACTIVE_START_DATE',
+            toatt='ACTIVE_FINISH_DATE'
+        )
+
+        """ user_dimension = Dimension(
+            name='DIM_WORKSPACE',
+            key='WORKSPACE_DIM_ID',
+            attributes=['STG_WORKSPACE_ROWID','WORKSPACE_ID','TITLE','SUMMARY','PLANNED_START','PLANNED_FINISH','PARENT_WORKSPACE_ID','HEALTH','ORIGINATED_FROM_PROPOSAL',
+                        'APPROVAL_STATUS','SUMMARY_TASK_ID','PRIORITY','PROJECT_NUMBER','STATE','NOTES','WORKSPACE_PHASE_ID','REQUEST_TYPE_ID','IS_CAPACITY_PLANNED',
+                        'OBJECT_STATUS','CREATED_ON','UPDATED_BY','UPDATED_ON','ACTIVE_START_DATE','ACTIVE_FINISH_DATE','VERSION','ENTERPRISE_ID'],
+            lookupatts=['WORKSPACE_ID']
+        ) """
+
+       
 
         connector = SF_CONNECTOR().get_connector()
         cursor = connector.cursor(DictCursor)
@@ -67,13 +80,13 @@ def process():
                     FROM "PPM_TEST"."PRIVATE"."STG_WORKSPACE"
                     WHERE enterpriseid = 'E93B6B81-4208-4E73-8F45-C6375238B363'
                 ) sw
-                WHERE NOT EXISTS (
+                WHERE (NOT EXISTS (
                         SELECT workspace_id
                         FROM dim_workspace dw
                         WHERE active_finish_date IS NULL
                             AND sw.workspaceid = dw.workspace_id
                             AND dw.enterprise_id = 'E93B6B81-4208-4E73-8F45-C6375238B363'
-                    )
+                    ) OR UPPER(sw.rowop) = 'U')
                     AND BITAND(sw.objectstatus, 8) = 0
                     AND (sw.rowop IS NULL OR UPPER(sw.rowop) IN ('I', 'U'))
                     AND rowid = latestrowid
@@ -86,10 +99,10 @@ def process():
                 summary, 
                 startdate as PLANNED_START, 
                 enddate as PLANNED_FINISH, 
-                parentworkspaceid, 
+                parentworkspaceid as PARENT_WORKSPACE_ID, 
                 externalid as PARENT_WORKSPACE_IDEXTERNAL_ID, 
                 health, 
-                workspaceproposalid as ORIGINATED_FROM_PROPOSAL, 
+                DECODE(sw.workspaceproposalid, NULL, FALSE, TRUE) as ORIGINATED_FROM_PROPOSAL, 
                 approvalstatus as APPROVAL_STATUS, 
                 summarytaskid as SUMMARY_TASK_ID, 
                 priority, 
@@ -123,8 +136,8 @@ def process():
             #split_timestamp(rec) """
 
         for rec in cursor:
-            workspace_dimension.insert(rec)
-            #print('{0}, {1}'.format(rec['WORKSPACEID'], rec['TITLE']))
+            workspace_dimension.scdensure(rec)
+
        
         connection.commit()
 
@@ -143,7 +156,7 @@ def split_timestamp(row):
     """Splits a timestamp containing a date into its three parts"""
 
     # First the timestamp is extracted from the row dictionary
-    timestamp = row['timestamp']
+    timestamp = row['CREATED_ON']
 
     # Then the string is split on the / in the time stamp
     timestamp_split = timestamp.split('/')
